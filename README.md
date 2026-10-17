@@ -7,26 +7,46 @@ Gyro Labyrinth is a mobile game that challenges players to navigate a ball throu
 ## App Screens
 
 #### Main Menu
-
 The central navigation hub providing quick access to gameplay modes, the editor, and settings.
-![Main Menu](assets/menu.png)
+
+<br>
+<p align="center">
+  <img src="assets/menu.png" alt="Main Menu">
+</p>
+<br>
 
 #### Level Selection
-
 A browsable list of available levels, categorized by pre-made, generated, and user-created. This screen displays the player's saved personal best time next to each level.
-![Level Selection](assets/level_selection.png)
+
+<br>
+<p align="center">
+  <img src="assets/level_selection.png" alt="Level Selection">
+</p>
+<br>
 
 #### Gameplay Screen
-
 The active game interface where players tilt their device to move the ball. Includes the labyrinth top-down view, a live timer, and a pause button.
-![Gameplay](assets/gameplay.png)
+
+<br>
+<p align="center">
+  <img src="assets/gameplay.png" alt="Gameplay">
+</p>
+<br>
 
 #### Post-Level Summary
-
 A results screen shown upon reaching the goal. It displays the completion time, indicates if a new record was set, and offers options to replay or return to the menu.
-![Level Summary](assets/level_summary.png)
+
+<br>
+<p align="center">
+  <img src="assets/level_summary.png" alt="Level Summary">
+</p>
+<br>
 
 #### Settings
-
 A configuration screen to adjust gyroscope sensitivity, toggle audio, and manage application preferences.
-![Settings](assets/settings.png)
+
+<br>
+<p align="center">
+  <img src="assets/settings.png" alt="Settings">
+</p>
+<br>

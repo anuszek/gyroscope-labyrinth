@@ -1,11 +1,11 @@
 import { StatusBar } from 'expo-status-bar';
 
-import Game from './app/Game';
+import { BallScreen } from './src/feature/ball/BallScreen';
 
 export default function App() {
   return (
     <>
-      <Game />
+      <BallScreen />
       <StatusBar hidden />
     </>
   );

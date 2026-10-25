@@ -1,11 +1,26 @@
 # Gyro Labyrinth
 
-## Description
+A ball rolls on a 2D floor. Tilt the phone to move it.
 
-Gyro Labyrinth is a mobile game that challenges players to navigate a ball through complex mazes using their device's built-in gyroscope. The application provides endless replayability through a procedural level generator, empowers users to build their own custom mazes with a dedicated level editor, and tracks completion times for each level to encourage speedrunning and personal bests.
+Built with Expo (SDK 58) and React Native Reanimated.
 
-## App Screens
+## Run
 
+```sh
+cd gyro-labyrinth
+npm install
+npx expo start
+```
+
+Scan the QR code with Expo Go on your phone.
+
+## Files
+
+* `App.tsx` – shows the ball screen.
+* `src/data/useTilt.ts` – reads the phone's tilt.
+* `src/feature/ball/useBall.ts` – moves the ball.
+* `src/feature/ball/BallScreen.tsx` – draws the floor and the ball.
+* `src/ui/theme/colors.ts` – colors.
 #### Main Menu
 The central navigation hub providing quick access to gameplay modes, the editor, and settings.
 

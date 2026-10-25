@@ -16,11 +16,17 @@ Scan the QR code with Expo Go on your phone.
 
 ## Files
 
-* `App.tsx` – shows the ball screen.
+* `App.tsx` – picks the screen for the current route.
+* `src/navigation/Navigator.tsx` – small screen stack (push / back / tabs, Android back button).
 * `src/data/useTilt.ts` – reads the phone's tilt.
-* `src/feature/ball/useBall.ts` – moves the ball.
-* `src/feature/ball/BallScreen.tsx` – draws the floor and the ball.
-* `src/ui/theme/colors.ts` – colors.
+* `src/data/levels.ts` – the level list (one level for now).
+* `src/data/GameStore.tsx` – settings (incl. dark mode) and best times, in memory.
+* `src/feature/ball/` – the original ball game (`BallScreen.tsx`, `useBall.ts`).
+* `src/feature/game/GameScreen.tsx` – shows the ball game with a back button.
+* `src/feature/menu/`, `levels/`, `summary/`, `settings/` – the other screens.
+* `src/ui/components/` – header, tab bar, buttons, slider, icons.
+* `src/ui/theme/` – light and dark colors, `useStyles` / `useColors` hooks.
+
 #### Main Menu
 The central navigation hub providing quick access to gameplay modes, the editor, and settings.
 

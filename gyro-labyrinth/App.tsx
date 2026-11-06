@@ -19,7 +19,7 @@ function CurrentScreen() {
     case 'settings':
       return <SettingsScreen />;
     case 'game':
-      return <GameScreen />;
+      return <GameScreen levelId={route.levelId} />;
     case 'summary':
       return <SummaryScreen levelId={route.levelId} time={route.time} previous={route.previous} />;
   }

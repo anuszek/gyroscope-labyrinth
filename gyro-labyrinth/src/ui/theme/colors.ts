@@ -22,7 +22,9 @@ export const lightColors = {
   currentText: '#2f5f8f',
 
   floor: '#f4ead5',
-  ball: '#c0c4cc',
+  ball: '#d9480f',
+  wall: '#4a4032',
+  wallEdge: '#2b241a',
 
   overlay: 'rgba(20, 24, 30, 0.35)',
 };
@@ -53,7 +55,9 @@ export const darkColors: Colors = {
   currentText: '#8fb8e6',
 
   floor: '#2a2621',
-  ball: '#c0c4cc',
+  ball: '#d9480f',
+  wall: '#6b6150',
+  wallEdge: '#8a7f6b',
 
   overlay: 'rgba(0, 0, 0, 0.55)',
 };

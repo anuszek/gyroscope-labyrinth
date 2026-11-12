@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeOut, SharedValue, useAnimatedStyle, withTiming, ZoomIn } from 'react-native-reanimated';
 
+import { formatSeconds } from '../../data/GameStore';
 import { Level } from '../../data/levels';
 import { colors } from '../../ui/theme/colors';
-import { Patrol, patrolAt, useBall } from './useBall';
+import { COUNTDOWN_MS, Patrol, patrolAt, useBall } from './useBall';
 
 type Props = {
   level: Level;
@@ -12,13 +13,31 @@ type Props = {
   onHit: () => void;
   onCountdown: (step: number) => void;
   onGoal: (time: number, coins: number) => void;
+  paused: boolean;
 };
 
-export function BallScreen({ level, onCoin, onHit, onCountdown, onGoal }: Props) {
+export function BallScreen({ level, onCoin, onHit, onCountdown, onGoal, paused }: Props) {
   // 3, 2, 1, then 0 for "GO!", then -1 once the text has gone.
   const [step, setStep] = useState(3);
-  const { x, y, scale, flash, clock, taken, cell, radius, wallTiles, finishTiles, coins, coinRadius, patrols, enemyRadius } =
-    useBall(level, {
+  const {
+    x,
+    y,
+    scale,
+    flash,
+    clock,
+    elapsed,
+    taken,
+    cell,
+    radius,
+    wallTiles,
+    finishTiles,
+    coins,
+    coinRadius,
+    patrols,
+    enemyRadius,
+  } = useBall(
+    level,
+    {
       onGoal,
       onCoin,
       onHit,
@@ -26,7 +45,9 @@ export function BallScreen({ level, onCoin, onHit, onCountdown, onGoal }: Props)
         setStep(next);
         onCountdown(next);
       },
-    });
+    },
+    paused,
+  );
 
   const ballStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value - radius }, { translateY: y.value - radius }, { scale: scale.value }],
@@ -52,6 +73,7 @@ export function BallScreen({ level, onCoin, onHit, onCountdown, onGoal }: Props)
       ))}
       <Animated.View style={[styles.ball, { width: radius * 2, height: radius * 2, borderRadius: radius }, ballStyle]} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.flash, flashStyle]} />
+      <Timer elapsed={elapsed} />
       {step >= 0 && (
         <View pointerEvents="none" style={styles.countWrap}>
           <Animated.View
@@ -65,6 +87,22 @@ export function BallScreen({ level, onCoin, onHit, onCountdown, onGoal }: Props)
         </View>
       )}
     </View>
+  );
+}
+
+// Shows the play time so far. It only re-renders itself, a few times a second.
+function Timer({ elapsed }: { elapsed: SharedValue<number> }) {
+  const [ms, setMs] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setMs(Math.max(0, elapsed.value - COUNTDOWN_MS)), 100);
+    return () => clearInterval(id);
+  }, [elapsed]);
+
+  return (
+    <Text style={styles.timer}>
+      {formatSeconds(ms)}
+    </Text>
   );
 }
 
@@ -147,6 +185,18 @@ const styles = StyleSheet.create({
   },
   flash: {
     backgroundColor: colors.hitFlash,
+  },
+  timer: {
+    position: 'absolute',
+    top: 24,
+    left: 0,
+    right: 0,
+    pointerEvents: 'none',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
   },
   countWrap: {
     ...StyleSheet.absoluteFill,

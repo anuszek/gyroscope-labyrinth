@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler } from 'react-native';
 
 export type Route =
@@ -16,15 +16,21 @@ type Navigation = {
   back: () => void;
   // Opens a bottom tab: keeps the menu as the root, drops everything else.
   openTab: (route: Route) => void;
+  // Lets a screen handle the hardware back button itself. Return true when it did.
+  interceptBack: (handler: (() => boolean) | null) => void;
 };
 
 const NavigationContext = createContext<Navigation | null>(null);
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<Route[]>([{ name: 'menu' }]);
+  const interceptor = useRef<(() => boolean) | null>(null);
 
   const navigation = useMemo<Navigation>(
     () => ({
+      interceptBack: (handler) => {
+        interceptor.current = handler;
+      },
       route: stack[stack.length - 1],
       canGoBack: stack.length > 1,
       push: (route) => setStack((s) => [...s, route]),
@@ -37,6 +43,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (interceptor.current?.()) return true;
       if (!navigation.canGoBack) return false;
       navigation.back();
       return true;
@@ -45,6 +52,16 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, [navigation]);
 
   return <NavigationContext.Provider value={navigation}>{children}</NavigationContext.Provider>;
+}
+
+// While the calling screen is shown, the hardware back button calls `handler` first.
+export function useBackInterceptor(handler: () => boolean) {
+  const { interceptBack } = useNavigation();
+
+  useEffect(() => {
+    interceptBack(handler);
+    return () => interceptBack(null);
+  }, [interceptBack, handler]);
 }
 
 export function useNavigation() {

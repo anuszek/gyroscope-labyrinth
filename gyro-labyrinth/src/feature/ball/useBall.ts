@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useFrameCallback, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -19,7 +20,7 @@ const TOP_BAR = 64; // kept clear of the board for the back button
 // The level starts with a 3-2-1 countdown, then "GO!" stays on screen a moment while play begins.
 const COUNT_FROM = 3;
 const COUNT_STEP_MS = 700;
-const COUNTDOWN_MS = COUNT_FROM * COUNT_STEP_MS;
+export const COUNTDOWN_MS = COUNT_FROM * COUNT_STEP_MS;
 const GO_MS = 500;
 
 type Box = { left: number; right: number; top: number; bottom: number };
@@ -59,7 +60,7 @@ type Callbacks = {
   onCountdown: (step: number) => void;
 };
 
-export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Callbacks) {
+export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Callbacks, paused: boolean) {
   const { width, height } = useWindowDimensions();
   const { settings } = useGameStore();
   const tilt = useTilt();
@@ -123,9 +124,15 @@ export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Ca
   const clock = useSharedValue(0); // seconds of play, drives the enemies
   const lastStep = useSharedValue(-2);
   const taken = useSharedValue<boolean[]>(coins.map(() => false));
+  const isPaused = useSharedValue(false);
+
+  useEffect(() => {
+    isPaused.value = paused;
+  }, [paused, isPaused]);
 
   useFrameCallback((frame) => {
-    if (finished.value) return;
+    // While paused nothing moves and the stopwatch stands still.
+    if (finished.value || isPaused.value) return;
 
     const delta = frame.timeSincePreviousFrame ?? 0;
     elapsed.value += delta;
@@ -215,5 +222,5 @@ export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Ca
     }
   });
 
-  return { x, y, scale, flash, clock, taken, cell, radius, wallTiles, finishTiles, coins, coinRadius, patrols, enemyRadius };
+  return { x, y, scale, flash, clock, elapsed, taken, cell, radius, wallTiles, finishTiles, coins, coinRadius, patrols, enemyRadius };
 }

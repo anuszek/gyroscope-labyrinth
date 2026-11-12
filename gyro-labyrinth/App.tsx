@@ -1,4 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { GameStoreProvider } from './src/data/GameStore';
 import { GameScreen } from './src/feature/game/GameScreen';
@@ -7,6 +9,7 @@ import { MenuScreen } from './src/feature/menu/MenuScreen';
 import { SettingsScreen } from './src/feature/settings/SettingsScreen';
 import { SummaryScreen } from './src/feature/summary/SummaryScreen';
 import { NavigationProvider, useNavigation } from './src/navigation/Navigator';
+import { useColors } from './src/ui/theme/useTheme';
 
 function CurrentScreen() {
   const { route } = useNavigation();
@@ -33,11 +36,26 @@ function CurrentScreen() {
   }
 }
 
+// Each screen fades in over the plain app background when the route changes.
+function Screens() {
+  const colors = useColors();
+  const { route } = useNavigation();
+  const key = 'levelId' in route ? `${route.name}-${route.levelId}` : route.name;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Animated.View key={key} entering={FadeIn.duration(250)} style={{ flex: 1 }}>
+        <CurrentScreen />
+      </Animated.View>
+    </View>
+  );
+}
+
 export default function App() {
   return (
     <GameStoreProvider>
       <NavigationProvider>
-        <CurrentScreen />
+        <Screens />
         <StatusBar hidden />
       </NavigationProvider>
     </GameStoreProvider>

@@ -1,23 +1,47 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import { useFeedback } from '../../data/feedback';
 import { useGameStore } from '../../data/GameStore';
 import { findTiles, getLevel } from '../../data/levels';
-import { useNavigation } from '../../navigation/Navigator';
-import { GlyphIcon } from '../../ui/components/Icons';
+import { useBackInterceptor, useNavigation } from '../../navigation/Navigator';
 import { lightColors } from '../../ui/theme/colors';
 import { BallScreen } from '../ball/BallScreen';
+import { PauseMenu } from './PauseMenu';
 
-// The ball game for one level, plus a back button to return to the menu and a coin counter.
+// Restarting a level mounts a fresh game, so the ball, coins and timer all start over.
 export function GameScreen({ levelId }: { levelId: number }) {
+  const [attempt, setAttempt] = useState(0);
+
+  return <Game key={attempt} levelId={levelId} onRestart={() => setAttempt((a) => a + 1)} />;
+}
+
+// The ball game for one level, plus a pause button, a coin counter and the pause menu.
+function Game({ levelId, onRestart }: { levelId: number; onRestart: () => void }) {
   const navigation = useNavigation();
   const { bestTimes, recordTime } = useGameStore();
   const feedback = useFeedback();
   const [collected, setCollected] = useState(0);
+  const [paused, setPaused] = useState(false);
   const bump = useSharedValue(1);
   const level = getLevel(levelId);
+
+  // The hardware back button pauses the game, and resumes it when already paused.
+  useBackInterceptor(
+    useCallback(() => {
+      setPaused((p) => !p);
+      return true;
+    }, []),
+  );
+
+  // Leaving the app pauses too, so the clock doesn't run while the player is away.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') setPaused(true);
+    });
+    return () => sub.remove();
+  }, []);
 
   // The counter gives a little pop each time a coin is picked up.
   useEffect(() => {
@@ -39,6 +63,7 @@ export function GameScreen({ levelId }: { levelId: number }) {
     <>
       <BallScreen
         level={level}
+        paused={paused}
         onCoin={() => {
           feedback.coin();
           setCollected((c) => c + 1);
@@ -49,23 +74,32 @@ export function GameScreen({ levelId }: { levelId: number }) {
         }}
         onGoal={finish}
       />
-      <Pressable style={styles.back} hitSlop={12} onPress={navigation.back}>
-        <GlyphIcon glyph="←" size={22} color={lightColors.text} />
+      <Pressable style={styles.pause} hitSlop={12} onPress={() => setPaused(true)}>
+        <View style={styles.bar} />
+        <View style={styles.bar} />
       </Pressable>
       {totalCoins > 0 && (
         <Animated.View style={[styles.counter, counterStyle]}>
-          <Animated.View style={styles.counterCoin} />
+          <View style={styles.counterCoin} />
           <Text style={styles.counterText}>
             {collected}/{totalCoins}
           </Text>
         </Animated.View>
+      )}
+      {paused && (
+        <PauseMenu
+          onResume={() => setPaused(false)}
+          onRestart={onRestart}
+          onQuit={navigation.back}
+        />
       )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { position: 'absolute', top: 24, left: 20 },
+  pause: { position: 'absolute', top: 24, left: 20, flexDirection: 'row', gap: 5, paddingVertical: 2 },
+  bar: { width: 5, height: 18, borderRadius: 2, backgroundColor: lightColors.text },
   counter: { position: 'absolute', top: 24, right: 20, flexDirection: 'row', alignItems: 'center', gap: 6 },
   counterCoin: {
     width: 16,

@@ -9,9 +9,9 @@ import { CheckIcon } from '../../ui/components/Icons';
 import { Colors } from '../../ui/theme/colors';
 import { useColors, useStyles } from '../../ui/theme/useTheme';
 
-type Props = { levelId: number; time: number; previous?: number };
+type Props = { levelId: number; time: number; previous?: number; coins: number; totalCoins: number };
 
-export function SummaryScreen({ levelId, time, previous }: Props) {
+export function SummaryScreen({ levelId, time, previous, coins, totalCoins }: Props) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const navigation = useNavigation();
@@ -37,6 +37,14 @@ export function SummaryScreen({ levelId, time, previous }: Props) {
             <Text style={styles.unit}>s</Text>
           </View>
           <Text style={styles.caption}>Completion Time</Text>
+          {totalCoins > 0 && (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.previous}>
+                Coins: <Text style={styles.previousValue}>{coins}/{totalCoins}</Text>
+              </Text>
+            </>
+          )}
           <View style={styles.divider} />
           <Text style={styles.previous}>
             Previous: <Text style={styles.previousValue}>{previous === undefined ? '--.-' : formatSeconds(previous, 2)}</Text>

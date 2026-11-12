@@ -21,7 +21,15 @@ function CurrentScreen() {
     case 'game':
       return <GameScreen levelId={route.levelId} />;
     case 'summary':
-      return <SummaryScreen levelId={route.levelId} time={route.time} previous={route.previous} />;
+      return (
+        <SummaryScreen
+          levelId={route.levelId}
+          time={route.time}
+          previous={route.previous}
+          coins={route.coins}
+          totalCoins={route.totalCoins}
+        />
+      );
   }
 }
 

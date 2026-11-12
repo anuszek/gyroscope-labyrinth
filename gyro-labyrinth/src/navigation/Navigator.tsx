@@ -6,7 +6,7 @@ export type Route =
   | { name: 'levels' }
   | { name: 'settings' }
   | { name: 'game'; levelId: number }
-  | { name: 'summary'; levelId: number; time: number; previous?: number };
+  | { name: 'summary'; levelId: number; time: number; previous?: number; coins: number; totalCoins: number };
 
 type Navigation = {
   route: Route;

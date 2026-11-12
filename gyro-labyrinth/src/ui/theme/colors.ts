@@ -25,6 +25,10 @@ export const lightColors = {
   ball: '#d9480f',
   wall: '#4a4032',
   wallEdge: '#2b241a',
+  coin: '#f5c518',
+  coinEdge: '#b88a00',
+  enemy: '#7c3aed',
+  enemyEdge: '#4c1d95',
 
   overlay: 'rgba(20, 24, 30, 0.35)',
 };
@@ -58,6 +62,10 @@ export const darkColors: Colors = {
   ball: '#d9480f',
   wall: '#6b6150',
   wallEdge: '#8a7f6b',
+  coin: '#f5c518',
+  coinEdge: '#b88a00',
+  enemy: '#a78bfa',
+  enemyEdge: '#6d28d9',
 
   overlay: 'rgba(0, 0, 0, 0.55)',
 };

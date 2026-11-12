@@ -29,6 +29,7 @@ export const lightColors = {
   coinEdge: '#b88a00',
   enemy: '#7c3aed',
   enemyEdge: '#4c1d95',
+  hitFlash: '#dc2626',
 
   overlay: 'rgba(20, 24, 30, 0.35)',
 };
@@ -66,6 +67,7 @@ export const darkColors: Colors = {
   coinEdge: '#b88a00',
   enemy: '#a78bfa',
   enemyEdge: '#6d28d9',
+  hitFlash: '#dc2626',
 
   overlay: 'rgba(0, 0, 0, 0.55)',
 };

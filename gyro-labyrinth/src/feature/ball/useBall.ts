@@ -1,7 +1,8 @@
 import { useWindowDimensions } from 'react-native';
-import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
+import { useFrameCallback, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { useGameStore } from '../../data/GameStore';
 import { findTiles, Level } from '../../data/levels';
 import { useTilt } from '../../data/useTilt';
 
@@ -14,6 +15,12 @@ const COIN_RATIO = 0.22; // coin radius, in tiles
 const ENEMY_RATIO = 0.32; // enemy radius, in tiles
 const ENEMY_SPEED = 2.5; // tiles per second, when a level doesn't say
 const TOP_BAR = 64; // kept clear of the board for the back button
+
+// The level starts with a 3-2-1 countdown, then "GO!" stays on screen a moment while play begins.
+const COUNT_FROM = 3;
+const COUNT_STEP_MS = 700;
+const COUNTDOWN_MS = COUNT_FROM * COUNT_STEP_MS;
+const GO_MS = 500;
 
 type Box = { left: number; right: number; top: number; bottom: number };
 
@@ -38,14 +45,28 @@ export function patrolAt(patrol: Patrol, seconds: number) {
   };
 }
 
+// 3, 2, 1 while counting down, 0 for "GO!", -1 once the text is gone.
+function countdownStep(elapsed: number) {
+  'worklet';
+  if (elapsed < COUNTDOWN_MS) return COUNT_FROM - Math.floor(elapsed / COUNT_STEP_MS);
+  return elapsed < COUNTDOWN_MS + GO_MS ? 0 : -1;
+}
+
 type Callbacks = {
   onGoal: (time: number, coins: number) => void;
   onCoin: (index: number) => void;
+  onHit: () => void;
+  onCountdown: (step: number) => void;
 };
 
-export function useBall(level: Level, { onGoal, onCoin }: Callbacks) {
+export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Callbacks) {
   const { width, height } = useWindowDimensions();
+  const { settings } = useGameStore();
   const tilt = useTilt();
+
+  // Sensitivity 0..1 scales how hard a tilt pushes (0.7, the default, is 1x).
+  const gain = 0.3 + settings.sensitivity;
+  const neutral = settings.calibration;
 
   const cols = level.rows[0].length;
   const rows = level.rows.length;
@@ -63,6 +84,7 @@ export function useBall(level: Level, { onGoal, onCoin }: Callbacks) {
   };
   const wallTiles = findTiles(level, '#').map(place);
   const finishTiles = findTiles(level, 'F').map(place);
+  const finishCenters = findTiles(level, 'F').map(center);
   const start = center(findTiles(level, 'S')[0]);
   const coins = findTiles(level, 'C').map(center);
   const patrols = level.enemies.map<Patrol>((enemy) => {
@@ -92,18 +114,37 @@ export function useBall(level: Level, { onGoal, onCoin }: Callbacks) {
   const y = useSharedValue(start.y);
   const vx = useSharedValue(0);
   const vy = useSharedValue(0);
+  const scale = useSharedValue(1); // the ball shrinks when hit and when it drops into the finish
+  const flash = useSharedValue(0); // red screen flash after a hit, 0..1
   const finished = useSharedValue(false);
-  const clock = useSharedValue(0); // seconds since the level began, drives the enemies
+  const respawning = useSharedValue(false);
+  // Our own stopwatch. The frame callback's own time restarts whenever the screen re-renders.
+  const elapsed = useSharedValue(0); // ms since the screen opened, countdown included
+  const clock = useSharedValue(0); // seconds of play, drives the enemies
+  const lastStep = useSharedValue(-2);
   const taken = useSharedValue<boolean[]>(coins.map(() => false));
 
   useFrameCallback((frame) => {
     if (finished.value) return;
 
-    const dt = Math.min((frame.timeSincePreviousFrame ?? 0) / 1000, 1 / 30);
-    clock.value = frame.timeSinceFirstFrame / 1000;
+    const delta = frame.timeSincePreviousFrame ?? 0;
+    elapsed.value += delta;
 
-    vx.value = (vx.value + tilt.value.x * ACCEL * dt) * FRICTION;
-    vy.value = (vy.value + tilt.value.y * ACCEL * dt) * FRICTION;
+    const step = countdownStep(elapsed.value);
+    if (step !== lastStep.value) {
+      lastStep.value = step;
+      scheduleOnRN(onCountdown, step);
+    }
+    // Ball and enemies hold still until the countdown is over.
+    if (step > 0) return;
+
+    clock.value = (elapsed.value - COUNTDOWN_MS) / 1000;
+    if (respawning.value) return;
+
+    const dt = Math.min(delta / 1000, 1 / 30);
+
+    vx.value = (vx.value + (tilt.value.x - neutral.x) * gain * ACCEL * dt) * FRICTION;
+    vy.value = (vy.value + (tilt.value.y - neutral.y) * gain * ACCEL * dt) * FRICTION;
     vx.value = Math.min(Math.max(vx.value, -MAX_SPEED), MAX_SPEED);
     vy.value = Math.min(Math.max(vy.value, -MAX_SPEED), MAX_SPEED);
 
@@ -129,10 +170,20 @@ export function useBall(level: Level, { onGoal, onCoin }: Callbacks) {
     for (const patrol of patrols) {
       const enemy = patrolAt(patrol, clock.value);
       if (Math.hypot(x.value - enemy.x, y.value - enemy.y) < reach) {
-        x.value = start.x;
-        y.value = start.y;
+        respawning.value = true;
         vx.value = 0;
         vy.value = 0;
+        flash.value = withSequence(withTiming(1, { duration: 60 }), withTiming(0, { duration: 350 }));
+        // Shrink away, reappear at the start, then grow back.
+        scale.value = withTiming(0, { duration: 150 }, (done) => {
+          if (!done) return;
+          x.value = start.x;
+          y.value = start.y;
+          scale.value = withTiming(1, { duration: 250 }, () => {
+            respawning.value = false;
+          });
+        });
+        scheduleOnRN(onHit);
         return;
       }
     }
@@ -148,14 +199,21 @@ export function useBall(level: Level, { onGoal, onCoin }: Callbacks) {
       }
     }
 
-    for (const box of finish) {
-      if (isInside(box, x.value, y.value)) {
+    for (let i = 0; i < finish.length; i++) {
+      if (isInside(finish[i], x.value, y.value)) {
         finished.value = true;
-        scheduleOnRN(onGoal, frame.timeSinceFirstFrame, taken.value.filter(Boolean).length);
+        const time = elapsed.value - COUNTDOWN_MS;
+        const coinCount = taken.value.filter(Boolean).length;
+        // The ball rolls into the finish tile and shrinks, then the level ends.
+        x.value = withTiming(finishCenters[i].x, { duration: 300 });
+        y.value = withTiming(finishCenters[i].y, { duration: 300 });
+        scale.value = withTiming(0.3, { duration: 400 }, (done) => {
+          if (done) scheduleOnRN(onGoal, time, coinCount);
+        });
         return;
       }
     }
   });
 
-  return { x, y, clock, cell, radius, wallTiles, finishTiles, coins, coinRadius, patrols, enemyRadius };
+  return { x, y, scale, flash, clock, taken, cell, radius, wallTiles, finishTiles, coins, coinRadius, patrols, enemyRadius };
 }

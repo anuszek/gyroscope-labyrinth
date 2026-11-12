@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { formatSeconds } from '../../data/GameStore';
 import { getLevel, levels } from '../../data/levels';
@@ -23,11 +24,13 @@ export function SummaryScreen({ levelId, time, previous, coins, totalCoins }: Pr
     <View style={styles.screen}>
       <Header title="Gyro Labyrinth" />
       <View style={styles.content}>
-        <Text style={styles.stage}>STAGE {String(levelId).padStart(2, '0')}</Text>
-        <Text style={styles.title}>Level Complete!</Text>
-        {level && <Text style={styles.levelName}>{level.name}</Text>}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.heading}>
+          <Text style={styles.stage}>STAGE {String(levelId).padStart(2, '0')}</Text>
+          <Text style={styles.title}>Level Complete!</Text>
+          {level && <Text style={styles.levelName}>{level.name}</Text>}
+        </Animated.View>
 
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.card}>
           <View style={styles.checkBubble}>
             <CheckIcon color={colors.currentText} size={16} />
           </View>
@@ -49,13 +52,15 @@ export function SummaryScreen({ levelId, time, previous, coins, totalCoins }: Pr
           <Text style={styles.previous}>
             Previous: <Text style={styles.previousValue}>{previous === undefined ? '--.-' : formatSeconds(previous, 2)}</Text>
           </Text>
-        </View>
+        </Animated.View>
 
-        {next && (
-          <Button label="Next Level" onPress={() => navigation.replace({ name: 'game', levelId: next.id })} />
-        )}
-        <Button variant="secondary" label="Play Again" onPress={() => navigation.replace({ name: 'game', levelId })} />
-        <Button variant="link" label="All Levels" onPress={() => navigation.openTab({ name: 'levels' })} />
+        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actions}>
+          {next && (
+            <Button label="Next Level" onPress={() => navigation.replace({ name: 'game', levelId: next.id })} />
+          )}
+          <Button variant="secondary" label="Play Again" onPress={() => navigation.replace({ name: 'game', levelId })} />
+          <Button variant="link" label="All Levels" onPress={() => navigation.openTab({ name: 'levels' })} />
+        </Animated.View>
       </View>
     </View>
   );
@@ -65,6 +70,8 @@ const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.background },
     content: { paddingHorizontal: 20, paddingTop: 24, gap: 10 },
+    heading: { gap: 10 },
+    actions: { gap: 10 },
     stage: { textAlign: 'center', fontSize: 13, letterSpacing: 0.8, color: colors.textMuted },
     title: { textAlign: 'center', fontSize: 30, fontWeight: '600', color: colors.text },
     levelName: { textAlign: 'center', fontSize: 14, color: colors.textMuted, marginTop: -4 },

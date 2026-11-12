@@ -21,14 +21,9 @@ export const lightColors = {
   currentBorder: '#bcd7f5',
   currentText: '#2f5f8f',
 
-  floor: '#f4ead5',
-  ball: '#d9480f',
-  wall: '#4a4032',
-  wallEdge: '#2b241a',
-  coin: '#f5c518',
-  coinEdge: '#b88a00',
-  enemy: '#7c3aed',
-  enemyEdge: '#4c1d95',
+  // The game board: a card (floor) with pastel maze walls.
+  floor: '#ffffff',
+  wall: '#bcd7f7',
   hitFlash: '#dc2626',
 
   overlay: 'rgba(20, 24, 30, 0.35)',
@@ -59,18 +54,9 @@ export const darkColors: Colors = {
   currentBorder: '#2f4a6b',
   currentText: '#8fb8e6',
 
-  floor: '#2a2621',
-  ball: '#d9480f',
-  wall: '#6b6150',
-  wallEdge: '#8a7f6b',
-  coin: '#f5c518',
-  coinEdge: '#b88a00',
-  enemy: '#a78bfa',
-  enemyEdge: '#6d28d9',
+  floor: '#1b1e24',
+  wall: '#41669a',
   hitFlash: '#dc2626',
 
   overlay: 'rgba(0, 0, 0, 0.55)',
 };
-
-// The original ball game always uses the light palette.
-export const colors = lightColors;

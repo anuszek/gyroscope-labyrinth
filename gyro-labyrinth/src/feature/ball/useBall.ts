@@ -15,7 +15,9 @@ const BALL_RATIO = 0.4; // half the ball's width, in tiles
 const COIN_RATIO = 0.22; // coin radius, in tiles
 const ENEMY_RATIO = 0.32; // enemy radius, in tiles
 const ENEMY_SPEED = 2.5; // tiles per second, when a level doesn't say
-const TOP_BAR = 64; // kept clear of the board for the back button
+const TOP_BAR = 108; // kept clear of the board for the HUD (level, timer, pause, coins)
+const BOARD_PAD = 10; // space between the maze and the edge of the board card
+const SCREEN_MARGIN = 12; // space between the board card and the edge of the screen
 
 // The level starts with a 3-2-1 countdown, then "GO!" stays on screen a moment while play begins.
 const COUNT_FROM = 3;
@@ -71,9 +73,11 @@ export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Ca
 
   const cols = level.rows[0].length;
   const rows = level.rows.length;
-  const cell = Math.min(width / cols, (height - TOP_BAR) / rows);
+  const inset = 2 * (SCREEN_MARGIN + BOARD_PAD);
+  const cell = Math.min((width - inset) / cols, (height - TOP_BAR - inset) / rows);
   const left = (width - cols * cell) / 2;
   const top = TOP_BAR + (height - TOP_BAR - rows * cell) / 2;
+  const board = { left: left - BOARD_PAD, top: top - BOARD_PAD, width: cols * cell + 2 * BOARD_PAD, height: rows * cell + 2 * BOARD_PAD };
   const radius = cell * BALL_RATIO;
   const coinRadius = cell * COIN_RATIO;
   const enemyRadius = cell * ENEMY_RATIO;
@@ -83,9 +87,28 @@ export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Ca
     const { left: l, top: t } = place(tile);
     return { x: l + cell / 2, y: t + cell / 2 };
   };
-  const wallTiles = findTiles(level, '#').map(place);
+  // Each wall tile is drawn rounded on the corners that face open floor, so walls look like soft pipes.
+  const isWall = (col: number, row: number) => level.rows[row]?.[col] === '#';
+  const cornerRadius = cell * 0.4;
+  const wallTiles = findTiles(level, '#').map((tile) => {
+    const up = isWall(tile.col, tile.row - 1);
+    const down = isWall(tile.col, tile.row + 1);
+    const side = { left: isWall(tile.col - 1, tile.row), right: isWall(tile.col + 1, tile.row) };
+    return {
+      ...place(tile),
+      topLeft: up || side.left ? 0 : cornerRadius,
+      topRight: up || side.right ? 0 : cornerRadius,
+      bottomRight: down || side.right ? 0 : cornerRadius,
+      bottomLeft: down || side.left ? 0 : cornerRadius,
+    };
+  });
   const finishTiles = findTiles(level, 'F').map(place);
   const finishCenters = findTiles(level, 'F').map(center);
+  // One goal marker in the middle of all the finish tiles.
+  const goal = {
+    x: finishCenters.reduce((sum, c) => sum + c.x, 0) / finishCenters.length,
+    y: finishCenters.reduce((sum, c) => sum + c.y, 0) / finishCenters.length,
+  };
   const start = center(findTiles(level, 'S')[0]);
   const coins = findTiles(level, 'C').map(center);
   const patrols = level.enemies.map<Patrol>((enemy) => {
@@ -211,9 +234,9 @@ export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Ca
         finished.value = true;
         const time = elapsed.value - COUNTDOWN_MS;
         const coinCount = taken.value.filter(Boolean).length;
-        // The ball rolls into the finish tile and shrinks, then the level ends.
-        x.value = withTiming(finishCenters[i].x, { duration: 300 });
-        y.value = withTiming(finishCenters[i].y, { duration: 300 });
+        // The ball rolls into the goal and shrinks, then the level ends.
+        x.value = withTiming(goal.x, { duration: 300 });
+        y.value = withTiming(goal.y, { duration: 300 });
         scale.value = withTiming(0.3, { duration: 400 }, (done) => {
           if (done) scheduleOnRN(onGoal, time, coinCount);
         });
@@ -222,5 +245,5 @@ export function useBall(level: Level, { onGoal, onCoin, onHit, onCountdown }: Ca
     }
   });
 
-  return { x, y, scale, flash, clock, elapsed, taken, cell, radius, wallTiles, finishTiles, coins, coinRadius, patrols, enemyRadius };
+  return { x, y, scale, flash, clock, elapsed, taken, cell, radius, board, start, goal, wallTiles, coins, coinRadius, patrols, enemyRadius };
 }

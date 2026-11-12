@@ -6,7 +6,9 @@ import { useFeedback } from '../../data/feedback';
 import { useGameStore } from '../../data/GameStore';
 import { findTiles, getLevel } from '../../data/levels';
 import { useBackInterceptor, useNavigation } from '../../navigation/Navigator';
-import { lightColors } from '../../ui/theme/colors';
+import { CoinSprite } from '../../ui/game/Sprites';
+import { Colors } from '../../ui/theme/colors';
+import { useStyles } from '../../ui/theme/useTheme';
 import { BallScreen } from '../ball/BallScreen';
 import { PauseMenu } from './PauseMenu';
 
@@ -17,8 +19,9 @@ export function GameScreen({ levelId }: { levelId: number }) {
   return <Game key={attempt} levelId={levelId} onRestart={() => setAttempt((a) => a + 1)} />;
 }
 
-// The ball game for one level, plus a pause button, a coin counter and the pause menu.
+// The ball game for one level, with the HUD (level name, pause button, coin counter) and the pause menu.
 function Game({ levelId, onRestart }: { levelId: number; onRestart: () => void }) {
+  const styles = useStyles(makeStyles);
   const navigation = useNavigation();
   const { bestTimes, recordTime } = useGameStore();
   const feedback = useFeedback();
@@ -45,7 +48,7 @@ function Game({ levelId, onRestart }: { levelId: number; onRestart: () => void }
 
   // The counter gives a little pop each time a coin is picked up.
   useEffect(() => {
-    if (collected > 0) bump.value = withSequence(withTiming(1.35, { duration: 90 }), withTiming(1, { duration: 160 }));
+    if (collected > 0) bump.value = withSequence(withTiming(1.2, { duration: 90 }), withTiming(1, { duration: 160 }));
   }, [collected, bump]);
   const counterStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.value }] }));
 
@@ -74,40 +77,80 @@ function Game({ levelId, onRestart }: { levelId: number; onRestart: () => void }
         }}
         onGoal={finish}
       />
-      <Pressable style={styles.pause} hitSlop={12} onPress={() => setPaused(true)}>
+      <View style={styles.levelPill}>
+        <View style={styles.levelDot} />
+        <Text style={styles.levelText}>Level {levelId}</Text>
+      </View>
+      <Pressable style={({ pressed }) => [styles.pause, pressed && styles.pressed]} hitSlop={8} onPress={() => setPaused(true)}>
         <View style={styles.bar} />
         <View style={styles.bar} />
       </Pressable>
       {totalCoins > 0 && (
         <Animated.View style={[styles.counter, counterStyle]}>
-          <View style={styles.counterCoin} />
+          <CoinSprite size={18} />
           <Text style={styles.counterText}>
             {collected}/{totalCoins}
           </Text>
         </Animated.View>
       )}
-      {paused && (
-        <PauseMenu
-          onResume={() => setPaused(false)}
-          onRestart={onRestart}
-          onQuit={navigation.back}
-        />
-      )}
+      {paused && <PauseMenu onResume={() => setPaused(false)} onRestart={onRestart} onQuit={navigation.back} />}
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  pause: { position: 'absolute', top: 24, left: 20, flexDirection: 'row', gap: 5, paddingVertical: 2 },
-  bar: { width: 5, height: 18, borderRadius: 2, backgroundColor: lightColors.text },
-  counter: { position: 'absolute', top: 24, right: 20, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  counterCoin: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: lightColors.coin,
-    borderWidth: 2,
-    borderColor: lightColors.coinEdge,
-  },
-  counterText: { fontSize: 18, fontWeight: '600', color: lightColors.text, fontVariant: ['tabular-nums'] },
-});
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+    levelPill: {
+      position: 'absolute',
+      top: 22,
+      left: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      height: 36,
+      paddingHorizontal: 14,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    levelDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
+    levelText: { fontSize: 14, color: colors.text },
+    pause: {
+      position: 'absolute',
+      top: 18,
+      right: 16,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      shadowColor: '#000000',
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    pressed: { opacity: 0.7 },
+    bar: { width: 4, height: 15, borderRadius: 2, backgroundColor: colors.text },
+    counter: {
+      position: 'absolute',
+      top: 68,
+      right: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      height: 32,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    counterText: { fontSize: 15, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
+  });

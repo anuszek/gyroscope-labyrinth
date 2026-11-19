@@ -17,7 +17,6 @@ type GameStore = {
   bestTimes: Record<number, number>;
   recordTime: (levelId: number, time: number) => void;
   isCompleted: (levelId: number) => boolean;
-  isUnlocked: (levelId: number) => boolean;
   currentLevelId: number;
 };
 
@@ -35,10 +34,6 @@ export function GameStoreProvider({ children }: { children: ReactNode }) {
 
   const store = useMemo<GameStore>(() => {
     const isCompleted = (id: number) => bestTimes[id] !== undefined;
-    const isUnlocked = (id: number) => {
-      const index = levels.findIndex((level) => level.id === id);
-      return index <= 0 || isCompleted(levels[index - 1].id);
-    };
     const current = levels.find((level) => !isCompleted(level.id)) ?? levels[levels.length - 1];
 
     return {
@@ -48,7 +43,6 @@ export function GameStoreProvider({ children }: { children: ReactNode }) {
       recordTime: (id, time) =>
         setBestTimes((b) => (b[id] === undefined || time < b[id] ? { ...b, [id]: time } : b)),
       isCompleted,
-      isUnlocked,
       currentLevelId: current.id,
     };
   }, [settings, bestTimes]);

@@ -13,6 +13,12 @@ export function useFeedback() {
     coin: () => {
       if (haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     },
+    powerup: () => {
+      if (haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    },
+    shieldBreak: () => {
+      if (haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    },
     hit: () => {
       if (haptics) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     },

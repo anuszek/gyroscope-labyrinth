@@ -5,7 +5,7 @@ import { formatSeconds, useGameStore } from '../../data/GameStore';
 import { Level, levels } from '../../data/levels';
 import { useNavigation } from '../../navigation/Navigator';
 import { Header } from '../../ui/components/Header';
-import { CheckIcon, LockIcon, PlayIcon } from '../../ui/components/Icons';
+import { CheckIcon, PlayIcon } from '../../ui/components/Icons';
 import { TabBar } from '../../ui/components/TabBar';
 import { Colors } from '../../ui/theme/colors';
 import { useColors, useStyles } from '../../ui/theme/useTheme';
@@ -62,21 +62,8 @@ function LevelCard({ level }: { level: Level }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const navigation = useNavigation();
-  const { bestTimes, isCompleted, isUnlocked, currentLevelId } = useGameStore();
+  const { bestTimes, isCompleted, currentLevelId } = useGameStore();
   const play = () => navigation.push({ name: 'game', levelId: level.id });
-
-  if (!isUnlocked(level.id)) {
-    return (
-      <View style={[styles.card, styles.cardLocked]}>
-        <Text style={[styles.number, styles.faint]}>{pad(level.id)}</Text>
-        <View style={styles.info}>
-          <Text style={[styles.name, styles.faint]}>{level.name}</Text>
-          <Text style={[styles.sub, styles.faint]}>Complete Level {pad(level.id - 1)} to unlock</Text>
-        </View>
-        <LockIcon />
-      </View>
-    );
-  }
 
   const current = level.id === currentLevelId && !isCompleted(level.id);
   const best = bestTimes[level.id];
@@ -137,11 +124,9 @@ const makeStyles = (colors: Colors) =>
       backgroundColor: colors.surface,
     },
     cardCurrent: { backgroundColor: colors.current, borderColor: colors.currentBorder },
-    cardLocked: { backgroundColor: colors.background, borderColor: colors.divider },
     pressed: { opacity: 0.8 },
     number: { fontSize: 19, color: colors.textMuted, width: 26 },
     currentText: { color: colors.currentText, fontWeight: '600' },
-    faint: { color: colors.textFaint },
     info: { flex: 1 },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     name: { fontSize: 19, color: colors.text },

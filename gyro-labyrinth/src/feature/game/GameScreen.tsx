@@ -72,6 +72,8 @@ function Game({ levelId, onRestart }: { levelId: number; onRestart: () => void }
           setCollected((c) => c + 1);
         }}
         onHit={feedback.hit}
+        onPowerup={feedback.powerup}
+        onShieldBreak={feedback.shieldBreak}
         onCountdown={(step) => {
           if (step >= 0) feedback.tick();
         }}

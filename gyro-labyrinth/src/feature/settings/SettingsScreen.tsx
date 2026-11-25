@@ -2,7 +2,6 @@ import { ReactNode, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 
-import { useFeedback } from '../../data/feedback';
 import { useGameStore } from '../../data/GameStore';
 import { deadZoneSize, MAX_DEAD_ZONE_DEGREES, steering, Tilt, tiltDegrees, tiltGain } from '../../data/tilt';
 import { useTilt } from '../../data/useTilt';
@@ -12,6 +11,7 @@ import { Slider } from '../../ui/components/Slider';
 import { TabBar } from '../../ui/components/TabBar';
 import { Colors } from '../../ui/theme/colors';
 import { useColors, useStyles } from '../../ui/theme/useTheme';
+import { CalibrationModal } from './CalibrationModal';
 
 const PAD = 148; // size of the live tilt preview
 const DOT = 18;
@@ -21,11 +21,11 @@ const FULL_PUSH = 0.6; // the push that fills the push bar
 export function SettingsScreen() {
   const colors = useColors();
   const styles = useStyles(makeStyles);
-  const feedback = useFeedback();
   const { settings, updateSettings } = useGameStore();
   const { tilt, gravity } = useTilt();
   const { sensitivity, deadZone, calibration } = settings;
   const [reading, setReading] = useState({ degrees: 0, sensor: true });
+  const [calibrating, setCalibrating] = useState(false);
 
   // What the sensor says right now, a few times a second. A phone with no motion sensor (a simulator, or
   // the web) reports all zeros, while a real one always reports about 9.8 m/s^2 of gravity.
@@ -47,11 +47,10 @@ export function SettingsScreen() {
   const calibratedAngle = tiltDegrees(calibration);
   const isCalibrated = calibration.x !== 0 || calibration.y !== 0;
 
-  const setNeutral = () => {
-    if (!reading.sensor) return;
-    const { x, y } = tilt.value;
-    updateSettings({ calibration: { x, y } });
-    feedback.goal();
+  // What the calibration popup reads: the raw tilt, and whether there is a sensor at all.
+  const readSensor = () => {
+    const g = gravity.value;
+    return { tilt: { x: tilt.value.x, y: tilt.value.y }, sensor: Math.hypot(g.x, g.y, g.z) > 1 };
   };
 
   return (
@@ -98,9 +97,9 @@ export function SettingsScreen() {
             icon={<TargetIcon color={colors.textMuted} size={14} />}
             iconColor={colors.divider}
             title="Calibrate Tilt"
-            subtitle="Hold the phone the way you play, then tap"
+            subtitle="Lay the phone flat to set the neutral position"
             right={
-              <Pressable style={({ pressed }) => [styles.neutralButton, pressed && styles.pressed]} onPress={setNeutral}>
+              <Pressable style={({ pressed }) => [styles.neutralButton, pressed && styles.pressed]} onPress={() => setCalibrating(true)}>
                 <GlyphIcon glyph="⊘" color={colors.infoText} size={14} />
                 <Text style={styles.neutralLabel}>Set Neutral</Text>
               </Pressable>
@@ -177,6 +176,12 @@ export function SettingsScreen() {
         <Text style={styles.version}>Gyro Labyrinth v1.0</Text>
       </ScrollView>
       <TabBar />
+      <CalibrationModal
+        visible={calibrating}
+        read={readSensor}
+        onCalibrated={(neutral) => updateSettings({ calibration: neutral })}
+        onClose={() => setCalibrating(false)}
+      />
     </View>
   );
 }

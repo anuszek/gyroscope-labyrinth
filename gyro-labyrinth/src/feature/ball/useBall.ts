@@ -1,23 +1,29 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useFrameCallback, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { useGameStore } from '../../data/GameStore';
-import { findTiles, isWanderer, Level, PowerupType } from '../../data/levels';
+import { findTiles, isBouncer, isWanderer, Level, PowerupType } from '../../data/levels';
+import { steering } from '../../data/tilt';
 import { useTilt } from '../../data/useTilt';
-import { Box, EnemyState, isInside, Patrol, patrolAt, stepWanderer } from './enemies';
+import { EnemyState, Patrol, patrolAt, stepBouncer, stepWanderer } from './enemies';
+import { Grid, moveBall, Wall } from './walls';
 
-const ACCEL = 1000;
-const FRICTION = 0.98;
-// Keeps each frame's move shorter than a wall is thick, so the ball can't jump through.
+const ACCEL = 1000; // pixels per second per second, for a push of 1
+// How fast the ball slows down when it isn't pushed. It is the same as losing 2% of its speed
+// each frame at 60 frames a second, but it doesn't depend on the frame rate.
+const DAMPING = 1.212;
 const MAX_SPEED = 1200;
 const BALL_RATIO = 0.4; // half the ball's width, in tiles
 const COIN_RATIO = 0.22; // coin radius, in tiles
 const ENEMY_RATIO = 0.32; // enemy radius, in tiles
 const POWERUP_RATIO = 0.3; // powerup radius, in tiles
+const GOAL_RATIO = 0.6; // the ball is home when its centre is this close to a finish tile's centre, in tiles
+const WALL_ROUNDING = 0.4; // corner radius of a wall tile, in tiles
 const ENEMY_SPEED = 2.5; // tiles per second, when a level doesn't say
-const TOP_BAR = 108; // kept clear of the board for the HUD (level, timer, pause, coins)
+const TOP_BAR = 108; // kept clear of the board for the HUD (level, timer, pause, coins), below the notch
 const BOARD_PAD = 10; // space between the maze and the edge of the board card
 const SCREEN_MARGIN = 12; // space between the board card and the edge of the screen
 
@@ -34,7 +40,9 @@ const COUNT_STEP_MS = 700;
 export const COUNTDOWN_MS = COUNT_FROM * COUNT_STEP_MS;
 const GO_MS = 500;
 
-type EnemyDef = { patrol: Patrol | null; speed: number };
+export type EnemyKind = 'patrol' | 'wander' | 'bounce';
+
+type EnemyDef = { kind: EnemyKind; patrol: Patrol | null; speed: number };
 
 // 3, 2, 1 while counting down, 0 for "GO!", -1 once the text is gone.
 function countdownStep(elapsed: number) {
@@ -52,88 +60,108 @@ type Callbacks = {
   onCountdown: (step: number) => void;
 };
 
-export function useBall(
-  level: Level,
-  { onGoal, onCoin, onHit, onPowerup, onShieldBreak, onCountdown }: Callbacks,
-  paused: boolean,
-) {
-  const { width, height } = useWindowDimensions();
-  const { settings } = useGameStore();
-  const tilt = useTilt();
-
-  // Sensitivity 0..1 scales how hard a tilt pushes (0.7, the default, is 1x).
-  const gain = 0.3 + settings.sensitivity;
-  const neutral = settings.calibration;
-
+// Works out where everything on the board goes on this screen. All of it is in pixels.
+function layout(level: Level, width: number, height: number, insets: { top: number; bottom: number }) {
   const cols = level.rows[0].length;
   const rows = level.rows.length;
   const inset = 2 * (SCREEN_MARGIN + BOARD_PAD);
-  const cell = Math.min((width - inset) / cols, (height - TOP_BAR - inset) / rows);
+  const areaTop = insets.top + TOP_BAR;
+  const areaHeight = height - areaTop - insets.bottom;
+  const cell = Math.min((width - inset) / cols, (areaHeight - inset) / rows);
   const left = (width - cols * cell) / 2;
-  const top = TOP_BAR + (height - TOP_BAR - rows * cell) / 2;
+  const top = areaTop + (areaHeight - rows * cell) / 2;
   const board = { left: left - BOARD_PAD, top: top - BOARD_PAD, width: cols * cell + 2 * BOARD_PAD, height: rows * cell + 2 * BOARD_PAD };
-  const radius = cell * BALL_RATIO;
-  const coinRadius = cell * COIN_RATIO;
-  const enemyRadius = cell * ENEMY_RATIO;
-  const powerupRadius = cell * POWERUP_RATIO;
 
   const place = ({ col, row }: { col: number; row: number }) => ({ left: left + col * cell, top: top + row * cell });
   const center = (tile: { col: number; row: number }) => {
     const { left: l, top: t } = place(tile);
     return { x: l + cell / 2, y: t + cell / 2 };
   };
-  // Each wall tile is drawn rounded on the corners that face open floor, so walls look like soft pipes.
+
+  // Each wall tile is rounded on the corners that face open floor, so walls look like soft pipes. The ball and
+  // the enemies collide with these same shapes. A tile that touches another wall also remembers which side it
+  // touches on, so the drawing can overlap there and leave no seam.
   const isWall = (col: number, row: number) => level.rows[row]?.[col] === '#';
-  const cornerRadius = cell * 0.4;
+  const rounding = cell * WALL_ROUNDING;
   const wallTiles = findTiles(level, '#').map((tile) => {
     const up = isWall(tile.col, tile.row - 1);
     const down = isWall(tile.col, tile.row + 1);
-    const side = { left: isWall(tile.col - 1, tile.row), right: isWall(tile.col + 1, tile.row) };
+    const leftSide = isWall(tile.col - 1, tile.row);
+    const rightSide = isWall(tile.col + 1, tile.row);
     return {
+      tile,
       ...place(tile),
-      topLeft: up || side.left ? 0 : cornerRadius,
-      topRight: up || side.right ? 0 : cornerRadius,
-      bottomRight: down || side.right ? 0 : cornerRadius,
-      bottomLeft: down || side.left ? 0 : cornerRadius,
+      joinsUp: up,
+      joinsDown: down,
+      joinsLeft: leftSide,
+      joinsRight: rightSide,
+      tl: up || leftSide ? 0 : rounding,
+      tr: up || rightSide ? 0 : rounding,
+      br: down || rightSide ? 0 : rounding,
+      bl: down || leftSide ? 0 : rounding,
     };
   });
-  const finishTiles = findTiles(level, 'F').map(place);
-  const finishCenters = findTiles(level, 'F').map(center);
-  // One goal marker in the middle of all the finish tiles.
-  const goal = {
-    x: finishCenters.reduce((sum, c) => sum + c.x, 0) / finishCenters.length,
-    y: finishCenters.reduce((sum, c) => sum + c.y, 0) / finishCenters.length,
-  };
-  const start = center(findTiles(level, 'S')[0]);
-  const coins = findTiles(level, 'C').map(center);
-  const powerups = level.powerups.map((powerup) => ({ ...center(powerup.at), type: powerup.type }));
+  const grid: Grid = { walls: Array(cols * rows).fill(null), cols, rows, left, top, cell };
+  for (const wall of wallTiles) {
+    const shape: Wall = { x: wall.left, y: wall.top, tl: wall.tl, tr: wall.tr, br: wall.br, bl: wall.bl };
+    grid.walls[wall.tile.row * cols + wall.tile.col] = shape;
+  }
 
+  const finishCenters = findTiles(level, 'F').map(center);
   const enemyDefs = level.enemies.map<EnemyDef>((enemy) => {
-    if (isWanderer(enemy)) return { patrol: null, speed: (enemy.speed ?? ENEMY_SPEED) * cell };
+    if (isWanderer(enemy)) return { kind: 'wander', patrol: null, speed: (enemy.speed ?? ENEMY_SPEED) * cell };
+    if (isBouncer(enemy)) return { kind: 'bounce', patrol: null, speed: (enemy.speed ?? ENEMY_SPEED) * cell };
     const a = center(enemy.from);
     const b = center(enemy.to);
-    return {
-      patrol: { x1: a.x, y1: a.y, x2: b.x, y2: b.y, length: Math.hypot(b.x - a.x, b.y - a.y), speed: (enemy.speed ?? ENEMY_SPEED) * cell },
-      speed: 0,
-    };
+    const speed = (enemy.speed ?? ENEMY_SPEED) * cell;
+    return { kind: 'patrol', patrol: { x1: a.x, y1: a.y, x2: b.x, y2: b.y, length: Math.hypot(b.x - a.x, b.y - a.y), speed }, speed };
   });
-  const enemyKinds = level.enemies.map((enemy) => (isWanderer(enemy) ? ('wander' as const) : ('patrol' as const)));
-  const enemyStarts = level.enemies.map<EnemyState>((enemy) => ({
-    ...center(isWanderer(enemy) ? enemy.wander : enemy.from),
-    dx: 0,
-    dy: 0,
-  }));
 
-  // Tiles grown by a moving thing's half width, so that thing can be treated as a point.
-  const growBy = (by: number) => (tile: { left: number; top: number }): Box => ({
-    left: tile.left - by,
-    right: tile.left + cell + by,
-    top: tile.top - by,
-    bottom: tile.top + cell + by,
-  });
-  const walls = wallTiles.map(growBy(radius));
-  const enemyWalls = wallTiles.map(growBy(enemyRadius));
-  const finish = finishTiles.map(growBy(radius));
+  return {
+    cell,
+    board,
+    grid,
+    wallTiles,
+    start: center(findTiles(level, 'S')[0]),
+    finishCenters,
+    // One goal marker in the middle of all the finish tiles.
+    goal: {
+      x: finishCenters.reduce((sum, c) => sum + c.x, 0) / finishCenters.length,
+      y: finishCenters.reduce((sum, c) => sum + c.y, 0) / finishCenters.length,
+    },
+    coins: findTiles(level, 'C').map(center),
+    powerups: level.powerups.map((powerup) => ({ ...center(powerup.at), type: powerup.type })),
+    enemyDefs,
+    enemyKinds: enemyDefs.map((def) => def.kind),
+    enemyStarts: level.enemies.map<EnemyState>((enemy) => ({
+      ...center(isWanderer(enemy) ? enemy.wander : isBouncer(enemy) ? enemy.bounce : enemy.from),
+      dx: 0,
+      dy: 0,
+    })),
+  };
+}
+
+export function useBall(
+  level: Level,
+  { onGoal, onCoin, onHit, onPowerup, onShieldBreak, onCountdown }: Callbacks,
+  paused: boolean,
+) {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { settings } = useGameStore();
+  const { tilt } = useTilt();
+
+  const { sensitivity, deadZone, calibration } = settings;
+  const { top: insetTop, bottom: insetBottom } = insets;
+  const { cell, board, grid, wallTiles, start, finishCenters, goal, coins, powerups, enemyDefs, enemyKinds, enemyStarts } = useMemo(
+    () => layout(level, width, height, { top: insetTop, bottom: insetBottom }),
+    [level, width, height, insetTop, insetBottom],
+  );
+  const radius = cell * BALL_RATIO;
+  const coinRadius = cell * COIN_RATIO;
+  const enemyRadius = cell * ENEMY_RATIO;
+  const powerupRadius = cell * POWERUP_RATIO;
+  const goalReach = cell * GOAL_RATIO;
 
   const x = useSharedValue(start.x);
   const y = useSharedValue(start.y);
@@ -193,38 +221,37 @@ export function useBall(
         now.push({ x: at.x, y: at.y, dx: 0, dy: 0 });
       } else if (frozen) {
         now.push(before[i]);
+      } else if (def.kind === 'bounce') {
+        now.push(stepBouncer(before[i], def.speed, dt, grid, enemyRadius));
       } else {
-        now.push(stepWanderer(before[i], def.speed, dt, enemyWalls));
+        now.push(stepWanderer(before[i], def.speed, dt, grid, enemyRadius));
       }
     }
     enemies.value = now;
 
     if (respawning.value) return;
 
+    // Tilt, less the calibration and the dead zone, scaled by sensitivity, pushes the ball. Friction is
+    // worked out per second, so the ball feels the same at 60 and at 120 frames a second.
     const boosted = clock.value < speedUntil.value;
-    const push = boosted ? gain * SPEED_PUSH : gain;
+    const push = steering(tilt.value, calibration, deadZone, sensitivity);
+    const pushScale = (boosted ? SPEED_PUSH : 1) * ACCEL * dt;
+    const damping = Math.exp(-DAMPING * dt);
     const cap = boosted ? MAX_SPEED * SPEED_CAP : MAX_SPEED;
-    vx.value = (vx.value + (tilt.value.x - neutral.x) * push * ACCEL * dt) * FRICTION;
-    vy.value = (vy.value + (tilt.value.y - neutral.y) * push * ACCEL * dt) * FRICTION;
-    vx.value = Math.min(Math.max(vx.value, -cap), cap);
-    vy.value = Math.min(Math.max(vy.value, -cap), cap);
-
-    // Move one axis at a time, so the ball slides along walls it hits.
-    x.value += vx.value * dt;
-    for (const wall of walls) {
-      if (isInside(wall, x.value, y.value)) {
-        x.value = vx.value > 0 ? wall.left : wall.right;
-        vx.value = 0;
-      }
+    let vxNext = (vx.value + push.x * pushScale) * damping;
+    let vyNext = (vy.value + push.y * pushScale) * damping;
+    const speed = Math.hypot(vxNext, vyNext);
+    if (speed > cap) {
+      vxNext = (vxNext / speed) * cap;
+      vyNext = (vyNext / speed) * cap;
     }
 
-    y.value += vy.value * dt;
-    for (const wall of walls) {
-      if (isInside(wall, x.value, y.value)) {
-        y.value = vy.value > 0 ? wall.top : wall.bottom;
-        vy.value = 0;
-      }
-    }
+    // The ball slides along walls and around their rounded corners.
+    const moved = moveBall(grid, radius, x.value, y.value, vxNext, vyNext, dt);
+    x.value = moved.x;
+    y.value = moved.y;
+    vx.value = moved.vx;
+    vy.value = moved.vy;
 
     // An enemy sends the ball back to the start (coins and time are kept), unless the enemy is
     // frozen, the ball is still safe from a moment ago, or a shield takes the hit.
@@ -287,8 +314,8 @@ export function useBall(
       }
     }
 
-    for (let i = 0; i < finish.length; i++) {
-      if (isInside(finish[i], x.value, y.value)) {
+    for (let i = 0; i < finishCenters.length; i++) {
+      if (Math.hypot(x.value - finishCenters[i].x, y.value - finishCenters[i].y) < goalReach) {
         finished.value = true;
         const time = elapsed.value - COUNTDOWN_MS;
         const coinCount = taken.value.filter(Boolean).length;

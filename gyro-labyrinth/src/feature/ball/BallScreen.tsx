@@ -12,6 +12,8 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 import { Level, PowerupType } from '../../data/levels';
 import {
@@ -111,24 +113,9 @@ export function BallScreen({ level, onCoin, onHit, onPowerup, onShieldBreak, onC
       <View style={{ position: 'absolute', left: start.x - startSize / 2, top: start.y - startSize / 2 }}>
         <StartMarker size={startSize} color={colors.textFaint} />
       </View>
-      {wallTiles.map((tile) => (
-        <View
-          key={`${tile.left},${tile.top}`}
-          style={{
-            position: 'absolute',
-            left: tile.left,
-            top: tile.top,
-            // A hair larger than the tile, so neighbouring walls never show a seam.
-            width: cell + 0.75,
-            height: cell + 0.75,
-            backgroundColor: colors.wall,
-            borderTopLeftRadius: tile.topLeft,
-            borderTopRightRadius: tile.topRight,
-            borderBottomRightRadius: tile.bottomRight,
-            borderBottomLeftRadius: tile.bottomLeft,
-          }}
-        />
-      ))}
+      <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Path d={wallsPath(wallTiles, cell)} fill={colors.wall} />
+      </Svg>
       <Animated.View
         pointerEvents="none"
         style={[
@@ -214,6 +201,36 @@ export function BallScreen({ level, onCoin, onHit, onPowerup, onShieldBreak, onC
   );
 }
 
+// How far a wall tile is drawn into a neighbouring wall, so the tiles overlap and no seam shows between them.
+const SEAM = 0.5;
+
+// Every wall as one shape. Each tile is a rounded box, the same one the ball and the enemies bump into.
+function wallsPath(walls: ReturnType<typeof useBall>['wallTiles'], cell: number) {
+  const arc = (radius: number, x: number, y: number) => (radius > 0 ? `A${radius} ${radius} 0 0 1 ${x} ${y}` : `L${x} ${y}`);
+
+  return walls
+    .map((wall) => {
+      const x0 = wall.left - (wall.joinsLeft ? SEAM : 0);
+      const x1 = wall.left + cell + (wall.joinsRight ? SEAM : 0);
+      const y0 = wall.top - (wall.joinsUp ? SEAM : 0);
+      const y1 = wall.top + cell + (wall.joinsDown ? SEAM : 0);
+      const { tl, tr, br, bl } = wall;
+      return [
+        `M${x0 + tl} ${y0}`,
+        `H${x1 - tr}`,
+        arc(tr, x1, y0 + tr),
+        `V${y1 - br}`,
+        arc(br, x1 - br, y1),
+        `H${x0 + bl}`,
+        arc(bl, x0, y1 - bl),
+        `V${y0 + tl}`,
+        arc(tl, x0 + tl, y0),
+        'Z',
+      ].join(' ');
+    })
+    .join(' ');
+}
+
 const pad = (n: number) => String(n).padStart(2, '0');
 
 // 83400 ms -> "01:23.4"
@@ -227,6 +244,7 @@ function formatClock(ms: number) {
 // Shows the play time so far. It only re-renders itself, a few times a second.
 function Timer({ elapsed }: { elapsed: SharedValue<number> }) {
   const styles = useStyles(makeStyles);
+  const { top } = useSafeAreaInsets();
   const [ms, setMs] = useState(0);
 
   useEffect(() => {
@@ -235,7 +253,7 @@ function Timer({ elapsed }: { elapsed: SharedValue<number> }) {
   }, [elapsed]);
 
   return (
-    <View style={styles.timer}>
+    <View style={[styles.timer, { top: top + 20 }]}>
       <Text style={styles.timerValue}>{formatClock(ms)}</Text>
       <Text style={styles.timerCaption}>ELAPSED</Text>
     </View>
@@ -257,6 +275,7 @@ function EffectsHud({
   clock: SharedValue<number>;
 }) {
   const styles = useStyles(makeStyles);
+  const { top } = useSafeAreaInsets();
   const [fx, setFx] = useState<Effects>({ shield: false, freeze: 0, speed: 0 });
 
   useEffect(() => {
@@ -277,7 +296,7 @@ function EffectsHud({
   if (fx.speed > 0) chips.push({ type: 'speed', label: `${fx.speed.toFixed(1)}s` });
 
   return (
-    <View pointerEvents="none" style={styles.effects}>
+    <View pointerEvents="none" style={[styles.effects, { top: top + 66 }]}>
       {chips.map((chip) => (
         <Animated.View
           key={chip.type}

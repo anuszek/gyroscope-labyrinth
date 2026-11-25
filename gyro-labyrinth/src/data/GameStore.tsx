@@ -1,14 +1,16 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Appearance } from 'react-native';
 
 import { levels } from './levels';
 
 export type Settings = {
-  sensitivity: number; // 0..1
+  sensitivity: number; // 0..1, see tiltGain
+  deadZone: number; // 0..1, see deadZoneSize
   sound: boolean;
   haptics: boolean;
   darkMode: boolean;
-  calibration: { x: number; y: number };
+  calibration: { x: number; y: number }; // the tilt that counts as "flat", see tilt.ts
 };
 
 type GameStore = {
@@ -22,15 +24,44 @@ type GameStore = {
 
 const GameStoreContext = createContext<GameStore | null>(null);
 
+// Settings and best times are kept on the phone between launches.
+const STORAGE_KEY = 'gyro-labyrinth/save-v1';
+
+type Saved = { settings?: Partial<Settings>; bestTimes?: Record<number, number> };
+
 export function GameStoreProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>({
-    sensitivity: 0.7,
+    sensitivity: 0.5,
+    deadZone: 0.25,
     sound: true,
     haptics: true,
     darkMode: Appearance.getColorScheme() === 'dark',
     calibration: { x: 0, y: 0 },
   });
   const [bestTimes, setBestTimes] = useState<Record<number, number>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  // Load what was saved last time. Anything missing from an older save keeps its default.
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const saved: Saved = JSON.parse(raw);
+        if (saved.settings) setSettings((s) => ({ ...s, ...saved.settings }));
+        if (saved.bestTimes) setBestTimes(saved.bestTimes);
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  // Save after every change, a moment late so dragging a slider doesn't write on every move.
+  useEffect(() => {
+    if (!loaded) return;
+    const id = setTimeout(() => {
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, bestTimes })).catch(() => {});
+    }, 300);
+    return () => clearTimeout(id);
+  }, [loaded, settings, bestTimes]);
 
   const store = useMemo<GameStore>(() => {
     const isCompleted = (id: number) => bestTimes[id] !== undefined;

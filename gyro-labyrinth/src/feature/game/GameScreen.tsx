@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useFeedback } from '../../data/feedback';
 import { useGameStore } from '../../data/GameStore';
@@ -22,6 +23,7 @@ export function GameScreen({ levelId }: { levelId: number }) {
 // The ball game for one level, with the HUD (level name, pause button, coin counter) and the pause menu.
 function Game({ levelId, onRestart }: { levelId: number; onRestart: () => void }) {
   const styles = useStyles(makeStyles);
+  const { top } = useSafeAreaInsets(); // keeps the HUD below the notch or camera cut-out
   const navigation = useNavigation();
   const { bestTimes, recordTime } = useGameStore();
   const feedback = useFeedback();
@@ -79,16 +81,16 @@ function Game({ levelId, onRestart }: { levelId: number; onRestart: () => void }
         }}
         onGoal={finish}
       />
-      <View style={styles.levelPill}>
+      <View style={[styles.levelPill, { top: top + 22 }]}>
         <View style={styles.levelDot} />
         <Text style={styles.levelText}>Level {levelId}</Text>
       </View>
-      <Pressable style={({ pressed }) => [styles.pause, pressed && styles.pressed]} hitSlop={8} onPress={() => setPaused(true)}>
+      <Pressable style={({ pressed }) => [styles.pause, { top: top + 18 }, pressed && styles.pressed]} hitSlop={8} onPress={() => setPaused(true)}>
         <View style={styles.bar} />
         <View style={styles.bar} />
       </Pressable>
       {totalCoins > 0 && (
-        <Animated.View style={[styles.counter, counterStyle]}>
+        <Animated.View style={[styles.counter, { top: top + 68 }, counterStyle]}>
           <CoinSprite size={18} />
           <Text style={styles.counterText}>
             {collected}/{totalCoins}

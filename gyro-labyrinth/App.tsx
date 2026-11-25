@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { GameStoreProvider } from './src/data/GameStore';
 import { GameScreen } from './src/feature/game/GameScreen';
@@ -53,11 +54,13 @@ function Screens() {
 
 export default function App() {
   return (
-    <GameStoreProvider>
-      <NavigationProvider>
-        <Screens />
-        <StatusBar hidden />
-      </NavigationProvider>
-    </GameStoreProvider>
+    <SafeAreaProvider>
+      <GameStoreProvider>
+        <NavigationProvider>
+          <Screens />
+          <StatusBar hidden />
+        </NavigationProvider>
+      </GameStoreProvider>
+    </SafeAreaProvider>
   );
 }

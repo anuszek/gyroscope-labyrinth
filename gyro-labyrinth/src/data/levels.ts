@@ -18,10 +18,21 @@ export type Wanderer = {
   speed?: number; // tiles per second
 };
 
-export type Enemy = Patroller | Wanderer;
+// A bouncing enemy flies in a straight line at any angle. Each time it hits a wall it leaves at a
+// new random angle, so it is much harder to read than a wanderer.
+export type Bouncer = {
+  bounce: Tile;
+  speed?: number; // tiles per second
+};
+
+export type Enemy = Patroller | Wanderer | Bouncer;
 
 export function isWanderer(enemy: Enemy): enemy is Wanderer {
   return 'wander' in enemy;
+}
+
+export function isBouncer(enemy: Enemy): enemy is Bouncer {
+  return 'bounce' in enemy;
 }
 
 // Powerups sit on a floor tile until the ball picks them up:
@@ -140,6 +151,48 @@ export const levels: Level[] = [
       { type: 'speed', at: { col: 1, row: 7 } },
       { type: 'freeze', at: { col: 9, row: 11 } },
       { type: 'shield', at: { col: 9, row: 13 } },
+    ],
+  },
+  {
+    id: 4,
+    name: 'Chaos Theory',
+    // Wide open rooms and fast bouncers that fly off the walls at any angle. They can slip through the
+    // gaps between the rooms too, so there is no place that is safe for long.
+    rows: [
+      '###########',
+      '#S...C....#',
+      '#.........#',
+      '#C.#...#..#',
+      '#.........#',
+      '####.#.####',
+      '#........C#',
+      '#..#...#..#',
+      '#....C...C#',
+      '#.........#',
+      '##.#####.##',
+      '#.C.......#',
+      '#...###...#',
+      '#...###..C#',
+      '#.C.......#',
+      '#####.#####',
+      '#.C.....C.#',
+      '#....F....#',
+      '###########',
+    ],
+    enemies: [
+      { bounce: { col: 8, row: 2 }, speed: 4.5 },
+      { bounce: { col: 5, row: 4 }, speed: 4 },
+      { bounce: { col: 3, row: 6 }, speed: 5 },
+      { bounce: { col: 8, row: 9 }, speed: 4.5 },
+      { bounce: { col: 5, row: 11 }, speed: 5 },
+      { bounce: { col: 9, row: 14 }, speed: 4.5 },
+      { bounce: { col: 7, row: 16 }, speed: 4 },
+    ],
+    powerups: [
+      { type: 'shield', at: { col: 2, row: 2 } },
+      { type: 'freeze', at: { col: 5, row: 9 } },
+      { type: 'speed', at: { col: 9, row: 12 } },
+      { type: 'shield', at: { col: 5, row: 14 } },
     ],
   },
 ];

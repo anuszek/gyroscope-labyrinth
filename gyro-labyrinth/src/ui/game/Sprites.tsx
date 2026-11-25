@@ -68,12 +68,13 @@ function spike(angle: number) {
   return `${point(24, -10)} ${point(48, 0)} ${point(24, 10)}`;
 }
 
-// Patrolling enemies are purple, wandering ones orange, so the player can tell them apart at a glance.
-export type EnemyTone = 'patrol' | 'wander';
+// Patrolling enemies are purple, wandering ones orange and bouncing ones red, so the player can tell them apart at a glance.
+export type EnemyTone = 'patrol' | 'wander' | 'bounce';
 
 const ENEMY_COLORS = {
   patrol: { light: '#c4b5fd', mid: '#8b5cf6', dark: '#6d28d9', spikes: '#5b21b6', edge: '#4c1d95' },
   wander: { light: '#fed7aa', mid: '#fb923c', dark: '#ea580c', spikes: '#9a3412', edge: '#7c2d12' },
+  bounce: { light: '#fecaca', mid: '#f87171', dark: '#dc2626', spikes: '#991b1b', edge: '#7f1d1d' },
 };
 
 // The enemy's spiky body. It is drawn apart from the face, so the body can spin and the face stay upright.
